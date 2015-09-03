@@ -1,0 +1,1 @@
+NoiseBLASTER32: Best thing to hit the music industry since sliced records
