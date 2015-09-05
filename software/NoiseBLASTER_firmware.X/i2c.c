@@ -6,13 +6,15 @@
  */
 #define _SUPPRESS_PLIB_WARNING
 #include <plib.h>
+#include <stdlib.h>
 #include "i2c.h"
 #include "sysclk.h"
 
 /**
  * Initialize the I2C
  */
-void InitI2C() {
+void InitI2C()
+{
     //I2C Pin Config
     mPORTBSetPinsDigitalOut(I2C_SCL_Pin | I2C_SDA_Pin);
 
@@ -60,7 +62,8 @@ void InitI2C() {
  * 
  * @param restart invoke a restart condition if true
  */
-void I2C_StartTransfer(BOOL restart) {
+void I2C_StartTransfer(BOOL restart)
+{
     // Send the Start (or Restart) signal
     if (restart) {
         I2CRepeatStart(I2C1);
@@ -82,7 +85,8 @@ void I2C_StartTransfer(BOOL restart) {
  * 
  * @param data The byte of data to send
  */
-BOOL I2C_TransmitOneByte(unsigned char data) {
+BOOL I2C_TransmitOneByte(unsigned char data)
+{
     // Wait for the transmitter to be ready
     while (!I2CTransmitterIsReady(I2C1));
 
@@ -111,7 +115,8 @@ BOOL I2C_TransmitOneByte(unsigned char data) {
  * Invokes an I2C no acknowledge
  * 
  */
-void I2C_Nack() {
+void I2C_Nack()
+{
     I2CAcknowledgeByte(I2C1, FALSE);
     while (!I2CAcknowledgeHasCompleted(I2C1));
 }
@@ -120,7 +125,8 @@ void I2C_Nack() {
  * Invokes an I2C acknowledge
  * 
  */
-void I2C_Ack() {
+void I2C_Ack()
+{
     I2CAcknowledgeByte(I2C1, TRUE);
     while (!I2CAcknowledgeHasCompleted(I2C1));
 }
@@ -131,7 +137,8 @@ void I2C_Ack() {
  * 
  * @return The received byte of data
  */
-unsigned char I2C_ReceiveOneByte() {
+unsigned char I2C_ReceiveOneByte()
+{
     I2CReceiverEnable(I2C1, TRUE);
     while (!I2CReceivedDataIsAvailable(I2C1));
     I2CReceiverEnable(I2C1, FALSE);
@@ -143,7 +150,8 @@ unsigned char I2C_ReceiveOneByte() {
  * Invokes an I2C stop condition
  * 
  */
-void I2C_StopTransfer() {
+void I2C_StopTransfer()
+{
     // Send the Stop signal
     I2CStop(I2C1);
 

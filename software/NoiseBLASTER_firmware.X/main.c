@@ -26,7 +26,6 @@
 #include "i2c.h"
 #include "dac.h"
 
-
 #define NUM_SECTORS 8
 
 // Flags to tell main to update data
@@ -47,6 +46,10 @@ int main(int argc, char** argv)
     // Set flash wait states, turn on instruction cache, and enable prefetch
     SYSTEMConfig(SYS_FREQ, SYS_CFG_WAIT_STATES | SYS_CFG_PCACHE);
     
+    // Wait to completely power up before
+    int i = 0;
+    for(i = 0; i < 1000000; i++);
+    
     InitDAC();
     
     // Initialize each of the subsystems
@@ -62,7 +65,6 @@ int main(int argc, char** argv)
     asm volatile("ei");
     
     //TestDMA();
-    int i;
     while(1){
         
         for(i = 0; i < 1000000; i++);
@@ -115,7 +117,7 @@ void InitPins(void)
     //Pin mapping Config - See Table 11-1 and 11-2 in the PIC32MX1XX/2XX Data Sheet
     PPSUnLock; // Allow PIN Mapping
     PPSOutput(1, RPA0, SS1);
-    PPSOutput(2, RPB5, SD01);
+    PPSOutput(2, RPB5, SDO1);
     PPSOutput(3, RPB2, REFCLKO);
     
     PPSInput(3, SDI2, RPB13);
