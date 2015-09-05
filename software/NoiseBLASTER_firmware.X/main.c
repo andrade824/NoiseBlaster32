@@ -9,6 +9,9 @@
 #pragma config FPLLMUL = MUL_21, FPLLIDIV = DIV_4, FPLLODIV = DIV_2, FWDTEN = OFF
 #pragma config POSCMOD = HS, FNOSC = PRIPLL, FPBDIV = DIV_1
 
+#pragma config FSOSCEN = OFF //SOSC OFF
+#pragma config JTAGEN = OFF //JTAG OFF
+
 #include <plib.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -20,6 +23,9 @@
 #include "sd.h"
 #include "uart.h"
 #include "dma.h"
+#include "i2c.h"
+#include "dac.h"
+
 
 #define NUM_SECTORS 8
 
@@ -41,11 +47,13 @@ int main(int argc, char** argv)
     // Set flash wait states, turn on instruction cache, and enable prefetch
     SYSTEMConfig(SYS_FREQ, SYS_CFG_WAIT_STATES | SYS_CFG_PCACHE);
     
+    InitDAC();
+    
     // Initialize each of the subsystems
     InitGPIO();
-    InitUART1();
-    InitSD();
-    InitDMA();
+    //InitUART1();
+    //InitSD();
+    //InitDMA();
     
     // Enable multi vectored interrupts
     INTCONSET = 0x1000;
@@ -53,7 +61,15 @@ int main(int argc, char** argv)
     // Enable global interrupts
     asm volatile("ei");
     
-    TestDMA();
+    //TestDMA();
+    int i;
+    while(1){
+        
+        for(i = 0; i < 1000000; i++);
+        DEBUG_LED_ON();
+        for(i = 0; i < 1000000; i++);
+        DEBUG_LED_OFF();
+    }
     
     return (EXIT_SUCCESS);
 }
