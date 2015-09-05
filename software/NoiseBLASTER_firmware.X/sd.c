@@ -89,7 +89,7 @@ uint8_t SPI_Write(uint8_t data)
  *                  Typically an address for a read/write.
  *  @param crc  The CRC value for this command, only used for the init command.
  * 
- *  @retval status read back from SD card (0xFF is a fault)
+ *  @return status read back from SD card (0xFF is a fault)
  *
  *    Expected return responses:
  *      FF - timeout 

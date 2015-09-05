@@ -7,7 +7,7 @@
 #define _SUPPRESS_PLIB_WARNING
  
 #pragma config FPLLMUL = MUL_21, FPLLIDIV = DIV_4, FPLLODIV = DIV_2, FWDTEN = OFF
-#pragma config POSCMOD = HS, FNOSC = PRIPLL, FPBDIV = DIV_1
+#pragma config POSCMOD = HS, FNOSC = PRIPLL, FPBDIV = DIV_1, ICESEL = ICS_PGx1
 
 #include <plib.h>
 #include <stdlib.h>
@@ -32,7 +32,7 @@ uint8_t frontbuffer[SECTOR_SIZE];
 uint8_t backbuffer[SECTOR_SIZE];
 
 // Init functions
-void InitGPIO(void);
+void InitPins(void);
 void TestSDCard(void);
 void TestDMA(void);
 
@@ -42,10 +42,10 @@ int main(int argc, char** argv)
     SYSTEMConfig(SYS_FREQ, SYS_CFG_WAIT_STATES | SYS_CFG_PCACHE);
     
     // Initialize each of the subsystems
-    InitGPIO();
-    InitUART1();
-    InitSD();
-    InitDMA();
+    InitPins();
+    //InitUART1();
+    //InitSD();
+    //InitDMA();
     
     // Enable multi vectored interrupts
     INTCONSET = 0x1000;
@@ -53,13 +53,23 @@ int main(int argc, char** argv)
     // Enable global interrupts
     asm volatile("ei");
     
-    TestDMA();
+    //TestDMA();
+    DEBUG_LED_ON();
+    
+    while(1)
+    {
+        
+    }
     
     return (EXIT_SUCCESS);
 }
 
-void InitGPIO(void)
+void InitPins(void)
 {
+    // Set all pins to be digital (no analog 4 u)
+    ANSELA = 0;
+    ANSELB = 0;
+    
     // Debug LED Pin
     mPORTAClearBits(BIT_1);
     mPORTASetPinsDigitalOut(BIT_1);
@@ -69,6 +79,36 @@ void InitGPIO(void)
     mPORTBClearBits(BIT_10);
     mPORTBSetPinsDigitalOut(BIT_10);
     mPORTBSetBits(BIT_10);
+    
+    /* All of the Peripheral Pin Select (PPS) Configuration */
+    
+    // I2S (SPI1) PPS
+    mPORTASetPinsDigitalOut(BIT_0);     // Slave Select 1 (SS1)
+    mPORTBSetPinsDigitalOut(BIT_5);     // Serial Digital Out (SDO1)
+    mPORTBSetPinsDigitalOut(BIT_2);     // I2S Master Clock (REFCLKO)
+    mPORTBSetPinsDigitalOut(BIT_14);    // Shift Clock 1 (SCK1)
+    
+    // SD Card (SPI2) PPS
+    mPORTBSetPinsDigitalIn(BIT_13);     // Serial Data In 2 (SDI2)
+    mPORTBSetPinsDigitalOut(BIT_10);    // Slave Select 2 (SS2)
+    mPORTASetPinsDigitalOut(BIT_4);      // Serial Data Out 2 (SDO2)
+    mPORTBSetPinsDigitalOut(BIT_15);    // Shift Clock 2 (SCK2)
+    
+    // UART PPS
+    mPORTBSetPinsDigitalOut(BIT_4);     // UART 1 Transmit (U1TX)
+ 
+    //Pin mapping Config - See Table 11-1 and 11-2 in the PIC32MX1XX/2XX Data Sheet
+    PPSUnLock; // Allow PIN Mapping
+    PPSOutput(1, RPA0, SS1);
+    PPSOutput(2, RPB5, SD01);
+    PPSOutput(3, RPB2, REFCLKO);
+    
+    PPSInput(3, SDI2, RPB13);
+    PPSOutput(4, RPB10, SS2);
+    PPSOutput(3, RPA4, SDO2);
+    
+    PPSOutput(1, RPB4, U1TX);
+    PPSLock; // Prevent Accidental Mapping
 }
 
 void TestSDCard(void)
@@ -117,4 +157,11 @@ void TestDMA(void)
             backbuffer_done_sending = false;
         }
     }
+}
+/**
+ * Initialize the I2S to interface with the 
+ */
+void InitI2S() 
+{
+    
 }

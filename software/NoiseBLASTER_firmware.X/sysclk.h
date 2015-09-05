@@ -8,7 +8,7 @@
 #ifndef SYSCLK_H
 #define	SYSCLK_H
 
-#define SYS_FREQ (40000000L)
+#define SYS_FREQ (44452800L)
 
 #endif	/* SYSCLK_H */
 
