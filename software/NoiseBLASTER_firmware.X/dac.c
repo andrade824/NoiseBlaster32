@@ -8,6 +8,7 @@
 #include <plib.h>
 #include "dac.h"
 #include "i2c.h"
+#include <stdbool.h>
 
 /**
  * Initialize the DAC
@@ -15,7 +16,7 @@
 void InitDAC()
 {
     InitI2C();
-    InitI2S();
+    //InitI2S();
     DAC_Reset();
     DAC_LineInMuteControl(1); //Line in muted
     DAC_VolumeControl(20); //Low Volume
@@ -27,10 +28,10 @@ void InitDAC()
     //DAC should be fully configured now
 }
 
-void InitI2S()
-{
+//void InitI2S()
+//{
     
-}
+//}
 
 /**
  * Writes to a register on the DAC over I2C
@@ -52,7 +53,7 @@ void DAC_Write(unsigned int registerAddress, unsigned int data)
  * 
  * @param mute Set true to mute
  */
-void DAC_LineInMuteControl(BOOL mute)
+void DAC_LineInMuteControl(bool mute)
 {
     DAC_Write(Left_LI_Control, (1<<8) | (mute << 7));
 }
@@ -78,7 +79,7 @@ void DAC_VolumeControl(unsigned char volume)
  * @param DAC_select Set true to turn the DAC on
  * @param bypass Set to true to bypass the DAC
  */
-void DAC_AnalogControl(BOOL DAC_select, BOOL bypass)
+void DAC_AnalogControl(bool DAC_select, bool bypass)
 {
     DAC_Write(Analog_Path_Control, (DAC_select << 4) | (bypass << 3) );
 }
@@ -89,7 +90,7 @@ void DAC_AnalogControl(BOOL DAC_select, BOOL bypass)
  * @param DAC_mute Set true to digitally mute the DAC
  */
 //HARDCODED 44.1 kHz
-void DAC_DigitalControl(BOOL DAC_mute)
+void DAC_DigitalControl(bool DAC_mute)
 {
     DAC_Write(Digital_Path_Control, (DAC_mute << 3) | (1 << 2) );
 }
@@ -104,7 +105,7 @@ void DAC_DigitalControl(BOOL DAC_mute)
  * @param DAC_dac Set to true to turn on the DAC
  * @param DAC_line_in Set to true to turn on the line in
  */
-void DAC_PowerDownControl(BOOL DAC_power, BOOL DAC_clk, BOOL DAC_osc, BOOL DAC_out, BOOL DAC_dac, BOOL DAC_line_in)
+void DAC_PowerDownControl(bool DAC_power, bool DAC_clk, bool DAC_osc, bool DAC_out, bool DAC_dac, bool DAC_line_in)
 {
     DAC_Write(Power_Down_Control, DAC_power << 7 | DAC_clk << 6 | DAC_osc << 5 | DAC_out << 4 | DAC_dac << 3 | DAC_line_in );
 }
@@ -117,7 +118,7 @@ void DAC_PowerDownControl(BOOL DAC_power, BOOL DAC_clk, BOOL DAC_osc, BOOL DAC_o
  * @param lrp Set to true to change the left right order
  */
 //HARDCODED I2S, 16 bit
-void DAC_DigitalAudioInterface(BOOL master, BOOL lr_swap, BOOL lrp)
+void DAC_DigitalAudioInterface(bool master, bool lr_swap, bool lrp)
 {
     DAC_Write(Digital_Interface_Format, master << 6 | lr_swap << 5 | lrp << 4 | 1 << 1);
 }
@@ -129,7 +130,7 @@ void DAC_DigitalAudioInterface(BOOL master, BOOL lr_swap, BOOL lrp)
  * @param clock_in_div Set to true to turn on the clock input divider
  */
 //HARDCODED normal mode, 384 fs, 16.9344 MHz, 44.1 kHz, clk_in_div should be 0
-void DAC_SampleRateControl(BOOL clk_out_div, BOOL clk_in_div)
+void DAC_SampleRateControl(bool clk_out_div, bool clk_in_div)
 {
     DAC_Write(Sample_Rate_Control, clk_out_div << 7 | clk_in_div << 6 | 1 << 5 | 1 << 1);
 }
@@ -139,7 +140,7 @@ void DAC_SampleRateControl(BOOL clk_out_div, BOOL clk_in_div)
  * 
  * @param on Set to true to turn on the digital audio interface
  */
-void DAC_Digital_Interface_Activation(BOOL on)
+void DAC_Digital_Interface_Activation(bool on)
 {
     DAC_Write(Digital_Interface_Activation, on);
 }

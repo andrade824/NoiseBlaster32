@@ -44,16 +44,33 @@ void InitSD(void)
         return;
     }
     
-    // 5. Attempt to initialize the card
+    SD_Enable();
+    // 5. Attempt to identify the card
     response = 0xFF;    // Make sure the response isn't zero before starting loop
-    while(response != 0x00)
+    while(response != 0xAA)//Verify that the SD card is an SDHC card
     {
         // need to constantly send this command and wait until response is zero
-        response = SD_SendCmd(1, 0, 0);
+        response = SD_SendCmd(8, 0x1AA, 0x87);
+        
+        //Read 32bit response, keep last one
+        response = SD_Read();
+        response = SD_Read();
+        response = SD_Read();
+        response = SD_Read();
     }
     
+    // 6. Attempt to initialize the card
+    //ACMD41
+    response = 0xFF;
+    while(response != 0x00)
+    {
+        response = SD_SendCmd(55, 0, 0);
+        response = SD_SendCmd(41, 1<<30, 0);
+    }
+    
+    //We need to add this back and check the response from CMD58 to check if the SD card is byte or block addressed
     // 6. Set the block size to 512 bytes
-    SD_SendCmd(16, SECTOR_SIZE, 0);
+    //SD_SendCmd(16, SECTOR_SIZE, 0);
     
     // 7. Reconfigure the SPI to use a faster clock now that we know the SD card works
     SET_SS();   // De-select the SD card
@@ -62,7 +79,7 @@ void InitSD(void)
     SPI2BRG = 0;  // SCK = Fpb/(2 * (BRG + 1))
     SPI2CONbits.ON = 1; // enable
     
-    //UART_SendString("Card is initialized (theoretically, anyways ._.)\n\r");
+    UART_SendString("Card is initialized\n\r");
 }
 
 /**
@@ -111,7 +128,8 @@ uint8_t SD_SendCmd(uint8_t cmd, uint32_t addr, uint8_t crc)
     uint16_t n;
     uint8_t res;
 
-    SD_Enable(); // enable SD card
+    //Alex - Commented out because it breaks multicycle responses (R7 response from CM8))
+    //SD_Enable(); // enable SD card
 
     SPI_Write(cmd | 0x40); // send command packet (6 bytes)
     SPI_Write((addr>>24) & 0xFF); // msb of the address/argument
@@ -128,7 +146,8 @@ uint8_t SD_SendCmd(uint8_t cmd, uint32_t addr, uint8_t crc)
             break;
     } while ( --n > 0);
 
-    SD_Disable();
+    //Alex - Commented out because it breaks multicycle responses (R7 response from CM8))
+    //SD_Disable();
     
     return (res); // return the result that we got from the SD card.
  }

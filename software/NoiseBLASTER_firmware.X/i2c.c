@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include "i2c.h"
 #include "sysclk.h"
+#include "uart.h"
+#include <stdbool.h>
 
 /**
  * Initialize the I2C
@@ -35,17 +37,9 @@ void InitI2C()
     I2CConfigure(I2C1, I2C_ENABLE_SLAVE_CLOCK_STRETCHING | I2C_ENABLE_HIGH_SPEED);
     // Set the I2C baud rate
     int I2C_actualClock = I2CSetFrequency(I2C1, SYS_FREQ, I2C_Clock);
-    if (abs(I2C_actualClock - I2C_Clock) > I2C_Clock / 10) {
-        //serialPrint("I2C Clock frequency (%d) error exceeds 10% = ");
-        //serialPrintInt(I2C_actualClock);
-        //serialPrint("Hz \r\n");
-
-        while (1);
-    } else {
-        //serialPrint("I2C Clock frequency = ");
-        //serialPrintInt(I2C_actualClock);
-        //serialPrint("Hz \r\n");
-    }
+    UART_SendString("I2C Clock: ");
+    UART_SendInt(I2C_actualClock);
+    UART_SendString(" Hz\n\r");
     // Enable the I2C bus
     I2CEnable(I2C1, TRUE);
 
@@ -62,7 +56,7 @@ void InitI2C()
  * 
  * @param restart invoke a restart condition if true
  */
-void I2C_StartTransfer(BOOL restart)
+void I2C_StartTransfer(bool restart)
 {
     // Send the Start (or Restart) signal
     if (restart) {
@@ -85,7 +79,7 @@ void I2C_StartTransfer(BOOL restart)
  * 
  * @param data The byte of data to send
  */
-BOOL I2C_TransmitOneByte(unsigned char data)
+bool I2C_TransmitOneByte(unsigned char data)
 {
     // Wait for the transmitter to be ready
     while (!I2CTransmitterIsReady(I2C1));

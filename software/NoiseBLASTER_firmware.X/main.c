@@ -26,7 +26,7 @@
 #include "i2c.h"
 #include "dac.h"
 
-#define NUM_SECTORS 8
+#define NUM_SECTORS 2
 
 // Flags to tell main to update data
 volatile bool frontbuffer_done_sending = 0;
@@ -50,12 +50,11 @@ int main(int argc, char** argv)
     int i = 0;
     for(i = 0; i < 1000000; i++);
     
-    InitDAC();
-    
     // Initialize each of the subsystems
     InitPins();
-    //InitUART1();
-    //InitSD();
+    InitUART1();
+    InitDAC();
+    InitSD();
     //InitDMA();
     
     // Enable multi vectored interrupts
@@ -65,6 +64,8 @@ int main(int argc, char** argv)
     asm volatile("ei");
     
     //TestDMA();
+    
+    TestSDCard();
     while(1){
         
         for(i = 0; i < 1000000; i++);
@@ -73,11 +74,7 @@ int main(int argc, char** argv)
         DEBUG_LED_OFF();
     }
     
-    while(1)
-    {
-        
-    }
-    
+    while(1);
     return (EXIT_SUCCESS);
 }
 
@@ -112,6 +109,7 @@ void InitPins(void)
     mPORTBSetPinsDigitalOut(BIT_15);    // Shift Clock 2 (SCK2)
     
     // UART PPS
+    mPORTBSetBits(BIT_4); //UART1 TX Pin
     mPORTBSetPinsDigitalOut(BIT_4);     // UART 1 Transmit (U1TX)
  
     //Pin mapping Config - See Table 11-1 and 11-2 in the PIC32MX1XX/2XX Data Sheet
@@ -174,11 +172,4 @@ void TestDMA(void)
             backbuffer_done_sending = false;
         }
     }
-}
-/**
- * Initialize the I2S to interface with the 
- */
-void InitI2S() 
-{
-    
 }
