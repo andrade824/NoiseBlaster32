@@ -20,3 +20,8 @@ funclist
 software/NoiseBLASTER_firmware.X/nbproject/Makefile-*
 software/NoiseBLASTER_firmware.X/disassembly/
 *.map
+
+History
+*.PrjPCBStructure
+Project Outputs for *
+Project Logs for *
