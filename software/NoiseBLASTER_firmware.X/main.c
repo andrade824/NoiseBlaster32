@@ -50,13 +50,12 @@ int main(int argc, char** argv)
     int i = 0;
     for(i = 0; i < 1000000; i++);
     
-    InitDAC();
-    
     // Initialize each of the subsystems
     InitPins();
     //InitUART1();
     //InitSD();
-    //InitDMA();
+    InitDAC();
+    InitDMA();
     
     // Enable multi vectored interrupts
     INTCONSET = 0x1000;
@@ -174,11 +173,4 @@ void TestDMA(void)
             backbuffer_done_sending = false;
         }
     }
-}
-/**
- * Initialize the I2S to interface with the 
- */
-void InitI2S() 
-{
-    
 }

@@ -15,21 +15,53 @@
 void InitDAC()
 {
     InitI2C();
-    InitI2S();
     DAC_Reset();
     DAC_LineInMuteControl(1); //Line in muted
-    DAC_VolumeControl(20); //Low Volume
-    DAC_AnalogControl(1, 1); //Bypass enabled? Not sure if that means switch open or closed
+    DAC_VolumeControl(33); //Low Volume
+    DAC_AnalogControl(1, 0); //Bypass enabled? Not sure if that means switch open or closed
     DAC_DigitalControl(0); //Digital mute off
-    DAC_PowerDownControl(0, 0, 1, 0, 0,1);// Power on, clock on, oscillator off, outputs on, dac on, line in off
-    DAC_DigitalAudioInterface(0, 0 ,0); //Slave, lr_swap off, lrp... check lrp, function default 16 bit and i2s
-    DAC_SampleRateControl(0,0); //No Dividers
+    DAC_PowerDownControl(0, 0, 1, 0, 0, 1);// Power on, clock on, oscillator off, outputs on, dac on, line in off
+    DAC_DigitalAudioInterface(0, 0, 0); //Slave, lr_swap off, lrp... check lrp, function default 16 bit and i2s
+    DAC_SampleRateControl(0, 0); //No Dividers
+    DAC_Digital_Interface_Activation(1);    // Activate the digital interface
+    
     //DAC should be fully configured now
+    
+    InitI2S();  // Setup the SPI module to start sending audio data
 }
 
+/**
+ * Initialize the I2S Module (SPI1) to 16-bit stereo mode
+ */
 void InitI2S()
 {
+    // Set up the REFCLKO
+    REFOCONbits.ROSEL = 2;  // Based off of primary oscillator
+    REFOTRIMbits.ROTRIM = 256;  // This will make a divisor of 1, aka, no divisor
+    REFOCONbits.DIVSWEN = 1;    // Switch to the new trim value
+    REFOCONbits.OE = 1;
+    REFOCONbits.ON = 1;
     
+    // Reset everything
+    SPI1CONbits.ON = 0;
+    SPI1CON2 = 0;
+    SPI1BRG = 0;
+    
+    // Setup SPI1
+    int rData = SPI1BUF;        // Clear out the receive buffer
+    SPI1CONbits.ENHBUF = 1;     // We want a FIFO buffer
+    SPI1CONbits.MCLKSEL = 1;    // Use REFCLK for BCLK (SCK) generation
+    SPI1STATbits.SPIROV = 0;    // Clear overflow bit
+    SPI1CON2bits.AUDMOD = 0;    // I2S mode
+    SPI1CON2bits.AUDEN = 1;     // Enable the Audio mode
+    SPI1CON2bits.AUDMONO = 1;
+    SPI1BRG = 5;                // 1.4112MHz BCLK (44.1KHz * 16bits * 2)
+    SPI1CONbits.STXISEL = 3;    // Trigger an interrupt when FIFO isn't full
+    SPI1CONbits.MSTEN = 1;      // Master Mode
+    SPI1CONbits.CKP = 1;        // Need this for I2S mode
+    SPI1CONbits.MODE16 = 0;     // Need this for I2S mode
+    SPI1CONbits.MODE32 = 0;     // Need this for I2S mode
+    SPI1CONbits.ON = 1;         // Start transmitting
 }
 
 /**
@@ -42,7 +74,7 @@ void DAC_Write(unsigned int registerAddress, unsigned int data)
 {
     I2C_StartTransfer(FALSE);
     I2C_TransmitOneByte(DAC_Address); //DAC Write
-    I2C_TransmitOneByte((registerAddress << 1) | ((data >> 8)&0x1FF)); //registerAddress is 7 bits, data is 9 bits
+    I2C_TransmitOneByte((registerAddress << 1) | ((data >> 8) & 0x1)); //registerAddress is 7 bits, data is 9 bits
     I2C_TransmitOneByte(data & 0xFF);
     I2C_StopTransfer();
 }
@@ -66,10 +98,10 @@ void DAC_VolumeControl(unsigned char volume)
 {
     //volume input should be between 0 and 79
     if(volume > 79) {
-            volume = 79;
+        volume = 79;
     }
 
-    DAC_Write(Right_H_Vol_Control, ((1<<8) | (1<<7) | (volume+48))); //written value below 48 = mute
+    DAC_Write(Right_H_Vol_Control, ((1<<8) | (1<<7) | (volume + 48))); //written value below 48 = mute
 }
 
 /**
