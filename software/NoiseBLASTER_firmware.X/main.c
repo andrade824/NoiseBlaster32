@@ -25,8 +25,9 @@
 #include "dma.h"
 #include "i2c.h"
 #include "dac.h"
+#include "timer.h"
 
-#define NUM_SECTORS 8
+#define NUM_SECTORS 2
 
 // Flags to tell main to update data
 volatile bool frontbuffer_done_sending = 0;
@@ -50,33 +51,26 @@ int main(int argc, char** argv)
     int i = 0;
     for(i = 0; i < 1000000; i++);
     
+    // Enable multi vectored interrupts
+    INTEnableSystemMultiVectoredInt(); //Do not call after setting up interrupts
+    
     // Initialize each of the subsystems
     InitPins();
-    //InitUART1();
-    //InitSD();
+    InitUART1();
+    InitDAC();
+    InitSD();
+    InitTimer25Hz();
     InitDAC();
     InitDMA();
-    
-    // Enable multi vectored interrupts
-    INTCONSET = 0x1000;
     
     // Enable global interrupts
     asm volatile("ei");
     
     //TestDMA();
-    while(1){
-        
-        for(i = 0; i < 1000000; i++);
-        DEBUG_LED_ON();
-        for(i = 0; i < 1000000; i++);
-        DEBUG_LED_OFF();
-    }
     
-    while(1)
-    {
-        
-    }
+    TestSDCard();
     
+    while(1);
     return (EXIT_SUCCESS);
 }
 
@@ -111,6 +105,7 @@ void InitPins(void)
     mPORTBSetPinsDigitalOut(BIT_15);    // Shift Clock 2 (SCK2)
     
     // UART PPS
+    mPORTBSetBits(BIT_4); //UART1 TX Pin
     mPORTBSetPinsDigitalOut(BIT_4);     // UART 1 Transmit (U1TX)
  
     //Pin mapping Config - See Table 11-1 and 11-2 in the PIC32MX1XX/2XX Data Sheet
