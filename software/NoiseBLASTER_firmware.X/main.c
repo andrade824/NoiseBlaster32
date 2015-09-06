@@ -25,6 +25,7 @@
 #include "dma.h"
 #include "i2c.h"
 #include "dac.h"
+#include "timer.h"
 
 #define NUM_SECTORS 2
 
@@ -50,15 +51,16 @@ int main(int argc, char** argv)
     int i = 0;
     for(i = 0; i < 1000000; i++);
     
+    // Enable multi vectored interrupts
+    INTEnableSystemMultiVectoredInt(); //Do not call after setting up interrupts
+    
     // Initialize each of the subsystems
     InitPins();
     InitUART1();
     InitDAC();
     InitSD();
+    InitTimer25Hz();
     //InitDMA();
-    
-    // Enable multi vectored interrupts
-    INTCONSET = 0x1000;
     
     // Enable global interrupts
     asm volatile("ei");
@@ -66,13 +68,6 @@ int main(int argc, char** argv)
     //TestDMA();
     
     TestSDCard();
-    while(1){
-        
-        for(i = 0; i < 1000000; i++);
-        DEBUG_LED_ON();
-        for(i = 0; i < 1000000; i++);
-        DEBUG_LED_OFF();
-    }
     
     while(1);
     return (EXIT_SUCCESS);
