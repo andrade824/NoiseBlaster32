@@ -23,35 +23,19 @@ extern volatile bool backbuffer_done_sending;
 extern int16_t frontbuffer[SECTOR_SIZE];
 extern int16_t backbuffer[SECTOR_SIZE];
 
-// counter used to stop DMA transfers
-static volatile uint8_t num_times = 0;
-
-#define TABLE_SIZE 512
-#define TWO_PI (3.14159 * 2)
-int16_t samples [TABLE_SIZE];
-
 /**
  * Initialize the DMA
  */
 void InitDMA(void)
-{
-    
-    float phaseIncrement = (TWO_PI/TABLE_SIZE) * freqMultipler;
-    float currentPhase = 0.0;
-
-    int i;
-    for (i = 0; i < TABLE_SIZE; i ++){
-        samples[i] = (int16_t)(sin(currentPhase) * 32767);
-        currentPhase += phaseIncrement;
-    }
-    
-    
+{   
     DmaChnIntDisable(0);    // Disable channel 0 interrupts
     DmaChnClrIntFlag(0);    // Clear interrupt flags
+    //DmaChnSetIntPriority(0, INT_PRIORITY_LEVEL_7, INT_SUB_PRIORITY_LEVEL_0); 
+    mDmaChnSetIntPriority(0, 7, 0);
     
     DMACONSET = 0x8000;     // Enable the DMA controller
     
-    DCH0SSA = KVA_TO_PA(samples);  // Source address is front buffer for audio
+    DCH0SSA = KVA_TO_PA(frontbuffer);  // Source address is front buffer for audio
     DCH0DSA = KVA_TO_PA(&SPI1BUF);   // Destination is SPI1 transmit register
     DCH0SSIZ = 512;   // Size of buffer
     DCH0DSIZ = 2;   // Size of SPI transmit register (8-bit mode)
@@ -61,20 +45,12 @@ void InitDMA(void)
     DCH0CON = 0x43;          // Channel off, pri 3, allow events while disabled
     DCH0CON = 0x53;
     DCH0ECON = 0x2600;      // Set start IRQ to 38 (SPI1 transmit)
-    /*
-    DmaChnClrIntFlag(0);
-    //DmaChnSetIntPriority(0, 7, 0);
-    INTSetVectorPriority(INT_DMA0, INT_PRIORITY_LEVEL_3);
-    INTSetVectorSubPriority(INT_DMA0, INT_SUB_PRIORITY_LEVEL_0); 
+    
     DCH0INTCLR = 0x8;       // Clear block transfer complete interrupt
     DCH0INTSET = 0x80000;   // Enable block transfer complete interrupt
     DmaChnIntEnable(0);     // Enable the interrupt in the interrupt controller
-    */
     
     DmaChnEnable(0);        // Enable the channel
-    
-    // Set the SIRQEN and CFORCE bits to start a DMA transfer
-    DCH0ECONSET = 0x90;
 }
 
 /*
@@ -82,35 +58,32 @@ void InitDMA(void)
  * 
  * DMA channel 0 block complete interrupt service routine
  */
-/*
-#pragma interrupt DmaCh0Int IPL7 vector 36
+
+#pragma interrupt DmaCh0Int IPL7 vector 40
 void DmaCh0Int(void)
 {
-    IFS1CLR = 0x10000;  // Clear channel 0 flag in interrupt controller
+    //IFS1CLR = 0x10000;  // Clear channel 0 flag in interrupt controller
+    DmaChnClrIntFlag(0);
     DCH0INTCLR = 0x8;   // Clear block transfer complete interrupt
     
-    //if(++num_times < 5)
-    //{
-        // If we just sent the front buffer, notify main thread
-        if(cur_buffer == FRONT)
-        {
-            // Start sending backbuffer
-            DCH0SSA = KVA_TO_PA(backbuffer);
-            cur_buffer = BACK;
+    // If we just sent the front buffer, notify main thread
+    if(cur_buffer == FRONT)
+    {
+        // Start sending backbuffer
+        DCH0SSA = KVA_TO_PA(backbuffer);
+        cur_buffer = BACK;
+        
+        frontbuffer_done_sending = true;
+    }
+    else
+    {
+        // Start sending frontbuffer
+        DCH0SSA = KVA_TO_PA(frontbuffer);
+        cur_buffer = FRONT;
+        
+        backbuffer_done_sending = true;
+    }
 
-            frontbuffer_done_sending = true;
-        }
-        else
-        {
-            // Start sending frontbuffer
-            DCH0SSA = KVA_TO_PA(frontbuffer);
-            cur_buffer = FRONT;
-
-            backbuffer_done_sending = true;
-        }
-
-        // Re-enable the channel, a start IRQ will trigger a transfer
-        DCH0CONSET = 0x80;
-    //}
+    // Re-enable the channel, a start IRQ will trigger a transfer
+    DCH0CONSET = 0x80;
 }
-*/

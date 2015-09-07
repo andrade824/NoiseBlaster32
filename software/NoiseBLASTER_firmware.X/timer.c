@@ -10,7 +10,8 @@
 #include "uart.h"
 #include "dac.h"
 #include <stdbool.h>
-#include "dma.h"
+
+extern uint32_t currentSector;
 
 volatile uint16_t vol_minus_button;
 volatile uint16_t play_button;
@@ -46,8 +47,7 @@ void __ISR(_TIMER_1_VECTOR, ipl2) Timer1Handler(void) {
         if(vol_minus_button == 15){
             // Execute prev
             UART_SendString("prev");
-            freqMultipler = freqMultipler - 2;
-            InitDMA();
+            currentSector -= 25000;
         }
     } else {
         if(vol_minus_button >= 2 && vol_minus_button < 15){
@@ -73,8 +73,7 @@ void __ISR(_TIMER_1_VECTOR, ipl2) Timer1Handler(void) {
         if(vol_plus_button == 15){
             // Execute next 
             UART_SendString("next");
-            freqMultipler = freqMultipler + 2;
-            InitDMA();
+            currentSector += 25000;
         }
     } else {
         if(vol_plus_button >= 2 && vol_plus_button < 15){

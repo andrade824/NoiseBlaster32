@@ -1,4 +1,4 @@
-/* 
+/*  
  * File:   main.c
  * Author: Devon
  *
@@ -30,20 +30,21 @@
 
 #define NUM_SECTORS 60
 
-uint16_t currentsector = 2;
+uint32_t currentSector = 2;
 
 // Flags to tell main to update data
 volatile bool frontbuffer_done_sending = 0;
 volatile bool backbuffer_done_sending = 0;
 
 // Buffers to store audio data
-uint8_t frontbuffer[SECTOR_SIZE];
-uint8_t backbuffer[SECTOR_SIZE];
+int16_t frontbuffer[SECTOR_SIZE];
+int16_t backbuffer[SECTOR_SIZE];
 
 // Init functions
 void InitPins(void);
 void TestSDCard(void);
 void TestDMA(void);
+void TestWavHeader();
 
 int main(int argc, char** argv) 
 {
@@ -69,30 +70,58 @@ int main(int argc, char** argv)
     
     TestWavHeader();
     
-    /*
+    
     SD_ReadSector(frontbuffer, 0);
     SD_ReadSector(backbuffer, 1);
+    // Set the SIRQEN and CFORCE bits to start a DMA transfer
+    DCH0ECONSET = 0x90;
     
     // Set the SIRQEN and CFORCE bits to start a DMA transfer
     DCH0ECONSET = 0x90;
     
     while(1){
+        for(i = 0; i < 100; i++); //Avoid Race Conditions
+        
         if (frontbuffer_done_sending){
             frontbuffer_done_sending = false;
             
-            SD_ReadSector(frontbuffer, currentsector);
-            currentsector += 1;
+            SD_ReadSector(frontbuffer, currentSector);
+            
+            //UART_SendInt(currentSector);
+            //UART_SendNewLine();
+            
+            UART_SendByte(0xFF);
+            UART_SendByte(0xAA);
+            UART_SendByte(0xFF);
+            
+            UART_SendByte(currentSector >> 24);
+            UART_SendByte(currentSector >> 16);
+            UART_SendByte(currentSector >> 8);
+            UART_SendByte(currentSector);
+            
+            currentSector += 1;
         }
         
         if (backbuffer_done_sending){
             backbuffer_done_sending = false;
             
-            SD_ReadSector(backbuffer, currentsector);
-            currentsector += 1;
+            SD_ReadSector(backbuffer, currentSector);
+            
+            //UART_SendInt(currentSector);
+            //UART_SendNewLine();
+            
+            UART_SendByte(0xFF);
+            UART_SendByte(0xAA);
+            UART_SendByte(0xFF);
+            
+            UART_SendByte(currentSector >> 24);
+            UART_SendByte(currentSector >> 16);
+            UART_SendByte(currentSector >> 8);
+            UART_SendByte(currentSector);
+            
+            currentSector += 1;
         }  
     }
-    */
-    while(1);
     return (EXIT_SUCCESS);
 }
 
@@ -174,32 +203,6 @@ void TestSDCard(void)
     DEBUG_LED_ON();
     
     UART_SendString("End Test\r\n");
-}
-
-void TestDMA(void)
-{
-    SD_ReadSector(frontbuffer, 0);
-    SD_ReadSector(backbuffer, 1);
-    
-    // Set the SIRQEN and CFORCE bits to start a DMA transfer
-    DCH0ECONSET = 0x90;
-    
-    while(1)
-    {
-        // Frontbuffer just finished sending, load it with new data
-        if(frontbuffer_done_sending)
-        {
-            SD_ReadSector(frontbuffer, 0);
-            frontbuffer_done_sending = false;
-        }
-        
-        // Backbuffer just finished sending, load it with new data
-        if(backbuffer_done_sending)
-        {
-            SD_ReadSector(backbuffer, 1);
-            backbuffer_done_sending = false;
-        }
-    }
 }
 
 void TestWavHeader(){

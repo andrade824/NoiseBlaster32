@@ -21,7 +21,7 @@ void InitDAC()
     InitI2C();
     DAC_Reset();
     DAC_LineInMuteControl(1); //Line in muted
-    DAC_VolumeControl(25); //Low Volume
+    DAC_VolumeControl(35); //Low Volume
     DAC_AnalogControl(1, 0); //Bypass enabled? Not sure if that means switch open or closed
     DAC_DigitalControl(0); //Digital mute off
     DAC_PowerDownControl(0, 0, 1, 0, 0, 1);// Power on, clock on, oscillator off, outputs on, dac on, line in off
@@ -58,7 +58,7 @@ void InitI2S()
     SPI1STATbits.SPIROV = 0;    // Clear overflow bit
     SPI1CON2bits.AUDMOD = 0;    // I2S mode
     SPI1CON2bits.AUDEN = 1;     // Enable the Audio mode
-    SPI1CON2bits.AUDMONO = 1;
+    SPI1CON2bits.AUDMONO = 0;
     SPI1BRG = 5;                // 1.4112MHz BCLK (44.1KHz * 16bits * 2)
     SPI1CONbits.STXISEL = 3;    // Trigger an interrupt when FIFO isn't full
     SPI1CONbits.MSTEN = 1;      // Master Mode

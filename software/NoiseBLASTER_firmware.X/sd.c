@@ -161,7 +161,8 @@ uint8_t SD_SendCmd(uint8_t cmd, uint32_t addr, uint8_t crc)
 void SD_ReadSector(uint8_t * buffer, uint32_t sector_num)
 {
     uint16_t i = 0;
-    uint32_t addr = sector_num * SECTOR_SIZE;
+    //uint32_t addr = sector_num * SECTOR_SIZE;
+    uint32_t addr = sector_num;
     
     SD_Enable(); // enable SD card
 
