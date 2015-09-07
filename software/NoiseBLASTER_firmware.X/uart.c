@@ -52,3 +52,10 @@ void UART_SendInt(unsigned int value) {
     sprintf(numstr, "%d", value);
     UART_SendString(numstr);
 }
+
+/**
+ * Print a new line
+ */
+void UART_SendNewLine() {
+    UART_SendString("\r\n");
+}

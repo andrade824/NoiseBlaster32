@@ -9,6 +9,9 @@
 #include "dac.h"
 #include "i2c.h"
 #include <stdbool.h>
+#include <stdint.h>
+
+uint8_t current_volume;
 
 /**
  * Initialize the DAC
@@ -18,7 +21,7 @@ void InitDAC()
     InitI2C();
     DAC_Reset();
     DAC_LineInMuteControl(1); //Line in muted
-    DAC_VolumeControl(33); //Low Volume
+    DAC_VolumeControl(25); //Low Volume
     DAC_AnalogControl(1, 0); //Bypass enabled? Not sure if that means switch open or closed
     DAC_DigitalControl(0); //Digital mute off
     DAC_PowerDownControl(0, 0, 1, 0, 0, 1);// Power on, clock on, oscillator off, outputs on, dac on, line in off
@@ -103,6 +106,7 @@ void DAC_VolumeControl(unsigned char volume)
     }
 
     DAC_Write(Right_H_Vol_Control, ((1<<8) | (1<<7) | (volume + 48))); //written value below 48 = mute
+    current_volume = volume;
 }
 
 /**
@@ -183,4 +187,18 @@ void DAC_Digital_Interface_Activation(bool on)
 void DAC_Reset()
 {
     DAC_Write(Reset_Register, 0xff);
+}
+
+void DAC_VolumeUP()
+{
+    if(current_volume+1 <= 79){
+        DAC_VolumeControl(current_volume+1);
+    }
+}
+
+void DAC_VolumeDOWN()
+{
+    if(current_volume-1 >= 0){
+        DAC_VolumeControl(current_volume-1);
+    }
 }

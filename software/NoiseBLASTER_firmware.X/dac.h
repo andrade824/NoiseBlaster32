@@ -40,5 +40,9 @@ void DAC_SampleRateControl(bool clk_out_div, bool clk_in_div);
 void DAC_Digital_Interface_Activation(bool on);
 void DAC_Reset();
 
+// Volume Control Helper Functions
+void DAC_VolumeUP();
+void DAC_VolumeDOWN();
+
 #endif	/* DAC_H */
 

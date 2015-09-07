@@ -26,8 +26,11 @@
 #include "i2c.h"
 #include "dac.h"
 #include "timer.h"
+#include "wav.h"
 
-#define NUM_SECTORS 2
+#define NUM_SECTORS 60
+
+uint16_t currentsector = 2;
 
 // Flags to tell main to update data
 volatile bool frontbuffer_done_sending = 0;
@@ -53,6 +56,8 @@ int main(int argc, char** argv)
     
     // Enable multi vectored interrupts
     INTEnableSystemMultiVectoredInt(); //Do not call after setting up interrupts
+    // Enable global interrupts
+    asm volatile("ei");
     
     // Initialize each of the subsystems
     InitPins();
@@ -60,16 +65,33 @@ int main(int argc, char** argv)
     InitDAC();
     InitSD();
     InitTimer25Hz();
-    InitDAC();
     InitDMA();
     
-    // Enable global interrupts
-    asm volatile("ei");
+    TestWavHeader();
     
-    //TestDMA();
+    /*
+    SD_ReadSector(frontbuffer, 0);
+    SD_ReadSector(backbuffer, 1);
     
-    TestSDCard();
+    // Set the SIRQEN and CFORCE bits to start a DMA transfer
+    DCH0ECONSET = 0x90;
     
+    while(1){
+        if (frontbuffer_done_sending){
+            frontbuffer_done_sending = false;
+            
+            SD_ReadSector(frontbuffer, currentsector);
+            currentsector += 1;
+        }
+        
+        if (backbuffer_done_sending){
+            backbuffer_done_sending = false;
+            
+            SD_ReadSector(backbuffer, currentsector);
+            currentsector += 1;
+        }  
+    }
+    */
     while(1);
     return (EXIT_SUCCESS);
 }
@@ -85,6 +107,16 @@ void InitPins(void)
     mPORTASetPinsDigitalOut(BIT_1);
     mPORTASetBits(BIT_1);
    
+    //Volume Minus Button Pin
+    mPORTBClearBits(BIT_7);
+    mPORTBSetPinsDigitalIn(BIT_7);
+    //Play Button Pin
+    mPORTBClearBits(BIT_11);
+    mPORTBSetPinsDigitalIn(BIT_11);
+    //Volume Plus Button Pin
+    mPORTBClearBits(BIT_3);
+    mPORTBSetPinsDigitalIn(BIT_3);
+    
     // SS on SPI1 (SD Card) Pin
     mPORTBClearBits(BIT_10);
     mPORTBSetPinsDigitalOut(BIT_10);
@@ -168,4 +200,40 @@ void TestDMA(void)
             backbuffer_done_sending = false;
         }
     }
+}
+
+void TestWavHeader(){
+    
+    extern WAV_HEADER wavHeader;
+    uint8_t wavSector[SECTOR_SIZE];
+
+    SD_ReadSector(wavSector, 0);
+    readWavHeader(wavSector);
+    
+    UART_SendNewLine();
+    UART_SendString(wavHeader.riffChunk);
+    UART_SendNewLine();
+    UART_SendInt(mergeUnsignedInt(wavHeader.fileSize,4));
+    UART_SendNewLine();
+    UART_SendString(wavHeader.format);
+    UART_SendNewLine();
+    UART_SendString(wavHeader.formatChunk);
+    UART_SendNewLine();
+    UART_SendInt(mergeUnsignedInt(wavHeader.formatChunkSize,4));
+    UART_SendNewLine();
+    UART_SendInt(mergeUnsignedInt(wavHeader.audioFormat,2));
+    UART_SendNewLine();
+    UART_SendInt(mergeUnsignedInt(wavHeader.channelCount,2));
+    UART_SendNewLine();
+    UART_SendInt(mergeUnsignedInt(wavHeader.sampleRate,4));
+    UART_SendNewLine();
+    UART_SendInt(mergeUnsignedInt(wavHeader.bytesPerSecond,4));
+    UART_SendNewLine();
+    UART_SendInt(mergeUnsignedInt(wavHeader.blockAlign,2));
+    UART_SendNewLine();
+    UART_SendInt(mergeUnsignedInt(wavHeader.bitsPerSample,2));
+    UART_SendNewLine();
+    UART_SendString(wavHeader.dataChunk);
+    UART_SendNewLine();
+    UART_SendNewLine();
 }

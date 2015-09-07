@@ -17,6 +17,7 @@ void InitUART1(void);
 void UART_SendByte(uint8_t data);
 void UART_SendString(char *buffer);
 void UART_SendInt(unsigned int value);
+void UART_SendNewLine();
 
 #endif	/* UART_H */
 

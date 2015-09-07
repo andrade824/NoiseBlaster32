@@ -8,6 +8,6 @@
 #ifndef TIMER_H
 #define	TIMER_H
 
-
+void InitTimer25Hz();
 
 #endif	/* TIMER_H */
