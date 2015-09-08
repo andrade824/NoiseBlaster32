@@ -35,16 +35,56 @@ uint32_t currentSector = 2;
 // Flags to tell main to update data
 volatile bool frontbuffer_done_sending = 0;
 volatile bool backbuffer_done_sending = 0;
+enum buffer_type { FRONT, BACK };
+volatile enum buffer_type cur_buffer = FRONT;
 
 // Buffers to store audio data
-int16_t frontbuffer[SECTOR_SIZE];
-int16_t backbuffer[SECTOR_SIZE];
+int8_t frontbuffer[SECTOR_SIZE];
+int8_t backbuffer[SECTOR_SIZE];
+
+//Button Timer Flags
+volatile bool vol_minus_pressed;
+volatile bool play_pressed;
+volatile bool vol_plus_pressed;
+volatile bool vol_minus_held;
+volatile bool play_held;
+volatile bool vol_plus_held;
 
 // Init functions
 void InitPins(void);
+// Test functions
 void TestSDCard(void);
-void TestDMA(void);
 void TestWavHeader();
+
+static enum {
+    EXCEP_IRQ = 0,            // interrupt
+    EXCEP_AdEL = 4,            // address error exception (load or ifetch)
+    EXCEP_AdES,                // address error exception (store)
+    EXCEP_IBE,                // bus error (ifetch)
+    EXCEP_DBE,                // bus error (load/store)
+    EXCEP_Sys,                // syscall
+    EXCEP_Bp,                // breakpoint
+    EXCEP_RI,                // reserved instruction
+    EXCEP_CpU,                // coprocessor unusable
+    EXCEP_Overflow,            // arithmetic overflow
+    EXCEP_Trap,                // trap (possible divide by zero)
+    EXCEP_IS1 = 16,            // implementation specfic 1
+    EXCEP_CEU,                // CorExtend Unuseable
+    EXCEP_C2E                // coprocessor 2
+} _excep_code;
+static unsigned int _epc_code;
+static unsigned int _excep_addr;
+// this function overrides the normal _weak_ generic handler
+void _general_exception_handler(void)
+{
+    asm volatile("mfc0 %0,$13" : "=r" (_excep_code));
+    asm volatile("mfc0 %0,$14" : "=r" (_excep_addr));
+    _excep_code = (_excep_code & 0x0000007C) >> 2;    
+    while (1) {
+        // Examine _excep_code to identify the type of exception
+        // Examine _excep_addr to find the address that caused the exception
+    }
+}
 
 int main(int argc, char** argv) 
 {
@@ -57,8 +97,6 @@ int main(int argc, char** argv)
     
     // Enable multi vectored interrupts
     INTEnableSystemMultiVectoredInt(); //Do not call after setting up interrupts
-    // Enable global interrupts
-    asm volatile("ei");
     
     // Initialize each of the subsystems
     InitPins();
@@ -68,6 +106,9 @@ int main(int argc, char** argv)
     InitTimer25Hz();
     InitDMA();
     
+    // Enable global interrupts
+    asm volatile("ei");
+    
     TestWavHeader();
     
     
@@ -76,29 +117,15 @@ int main(int argc, char** argv)
     // Set the SIRQEN and CFORCE bits to start a DMA transfer
     DCH0ECONSET = 0x90;
     
-    // Set the SIRQEN and CFORCE bits to start a DMA transfer
-    DCH0ECONSET = 0x90;
-    
     while(1){
-        for(i = 0; i < 100; i++); //Avoid Race Conditions
-        
+        // Disable interrupts to avoid read/write problems when reading variables accessed by interrupts
+        // Disable interrupts to avoid crashes during I2C read when an interrupt fires during transmission
+        // Enable intterupts at the end of the loop
+        asm volatile("di");
         if (frontbuffer_done_sending){
             frontbuffer_done_sending = false;
             
             SD_ReadSector(frontbuffer, currentSector);
-            
-            //UART_SendInt(currentSector);
-            //UART_SendNewLine();
-            
-            UART_SendByte(0xFF);
-            UART_SendByte(0xAA);
-            UART_SendByte(0xFF);
-            
-            UART_SendByte(currentSector >> 24);
-            UART_SendByte(currentSector >> 16);
-            UART_SendByte(currentSector >> 8);
-            UART_SendByte(currentSector);
-            
             currentSector += 1;
         }
         
@@ -106,21 +133,34 @@ int main(int argc, char** argv)
             backbuffer_done_sending = false;
             
             SD_ReadSector(backbuffer, currentSector);
-            
-            //UART_SendInt(currentSector);
-            //UART_SendNewLine();
-            
-            UART_SendByte(0xFF);
-            UART_SendByte(0xAA);
-            UART_SendByte(0xFF);
-            
-            UART_SendByte(currentSector >> 24);
-            UART_SendByte(currentSector >> 16);
-            UART_SendByte(currentSector >> 8);
-            UART_SendByte(currentSector);
-            
             currentSector += 1;
-        }  
+        }
+        
+        if (vol_plus_pressed == true){
+            DAC_VolumeUP();
+            vol_plus_pressed = false;
+        }
+        if (vol_plus_held == true){
+            currentSector += 25000;
+            vol_plus_held = false;
+        }
+        /*
+        if (play_pressed == true){
+            
+        }
+        if (play_held == true){
+            
+        }*/
+        
+        if (vol_minus_pressed == true){
+            DAC_VolumeDOWN();
+            vol_minus_pressed = false;
+        }
+        if (vol_minus_held == true){
+            currentSector -= 25000;
+            vol_minus_held = false;
+        }
+        asm volatile("ei");
     }
     return (EXIT_SUCCESS);
 }

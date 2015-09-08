@@ -5,19 +5,23 @@
  * Created on September 5, 2015, 4:50 PM
  */
 #define _SUPPRESS_PLIB_WARNING
+#include <xc.h>
 #include <plib.h>
 #include "sysclk.h"
-#include "uart.h"
-#include "dac.h"
 #include <stdbool.h>
+#include <stdint.h>
 
-extern uint32_t currentSector;
+volatile uint8_t vol_minus_button;
+volatile uint8_t play_button;
+volatile uint8_t vol_plus_button;
 
-volatile uint16_t vol_minus_button;
-volatile uint16_t play_button;
-volatile uint16_t vol_plus_button;
-
-volatile uint8_t freqMultipler  = 2;
+//Button Timer Flags
+extern volatile bool vol_minus_pressed = false;
+extern volatile bool play_pressed = false;
+extern volatile bool vol_plus_pressed = false;
+extern volatile bool vol_minus_held = false;
+extern volatile bool play_held = false;
+extern volatile bool vol_plus_held = false;
 
 /*
  * Initializes the 25Hz Timer Interrupt
@@ -36,7 +40,7 @@ void InitTimer25Hz()
  * Interrupt Service Routine for the 25Hz Timer
  * 
  * Debounces the buttons and detects if a button is held or short pressed
- * Toggles the debug LED to show that the PIC has booted up
+ * Toggles the debug LED to show that the PIC is running and not in the exception handler
  */
 void __ISR(_TIMER_1_VECTOR, ipl2) Timer1Handler(void) {
     INTClearFlag(INT_T1); // Clear the interrupt flag
@@ -46,25 +50,27 @@ void __ISR(_TIMER_1_VECTOR, ipl2) Timer1Handler(void) {
         vol_minus_button += 1;
         if(vol_minus_button == 15){
             // Execute prev
-            UART_SendString("prev");
-            currentSector -= 25000;
+            vol_minus_held = true;
         }
     } else {
         if(vol_minus_button >= 2 && vol_minus_button < 15){
             // Execute vol minus
-            DAC_VolumeDOWN();
-            UART_SendString("-");
+            vol_minus_pressed = true;
         }
         vol_minus_button = 0;
     }
     
     if(!PORTBbits.RB11) { //play_button
-        play_button += 1;
-        // Execute play
-        if(play_button == 3){
-            UART_SendString("play");
+        play_button += 1; 
+        if(play_button == 15){
+            // Execute play held
+            play_held = true;
         }
     }else {
+        if(vol_minus_button >= 2 && vol_minus_button < 15){
+            // Execute play press
+            play_pressed = true;
+        }
         play_button = 0;
     }
     
@@ -72,14 +78,12 @@ void __ISR(_TIMER_1_VECTOR, ipl2) Timer1Handler(void) {
         vol_plus_button += 1;
         if(vol_plus_button == 15){
             // Execute next 
-            UART_SendString("next");
-            currentSector += 25000;
+            vol_plus_held = true;
         }
     } else {
         if(vol_plus_button >= 2 && vol_plus_button < 15){
             // Execute vol plus
-            DAC_VolumeUP();
-            UART_SendString("+");
+            vol_plus_pressed = true;
         }
         vol_plus_button = 0;
     }

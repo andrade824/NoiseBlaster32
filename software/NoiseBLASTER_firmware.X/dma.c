@@ -9,11 +9,9 @@
 #include "uart.h"
 #include "timer.h"
 
-extern volatile uint8_t freqMultipler;
-
 // Which buffer that was just sent out
 enum buffer_type { FRONT, BACK };
-static volatile enum buffer_type cur_buffer = FRONT;
+extern volatile enum buffer_type cur_buffer;
 
 // Flags to tell main thread to update data
 extern volatile bool frontbuffer_done_sending;
@@ -31,15 +29,15 @@ void InitDMA(void)
     DmaChnIntDisable(0);    // Disable channel 0 interrupts
     DmaChnClrIntFlag(0);    // Clear interrupt flags
     //DmaChnSetIntPriority(0, INT_PRIORITY_LEVEL_7, INT_SUB_PRIORITY_LEVEL_0); 
-    mDmaChnSetIntPriority(0, 7, 0);
+    mDmaChnSetIntPriority(0, 7, 1);
     
     DMACONSET = 0x8000;     // Enable the DMA controller
     
     DCH0SSA = KVA_TO_PA(frontbuffer);  // Source address is front buffer for audio
     DCH0DSA = KVA_TO_PA(&SPI1BUF);   // Destination is SPI1 transmit register
     DCH0SSIZ = 512;   // Size of buffer
-    DCH0DSIZ = 2;   // Size of SPI transmit register (8-bit mode)
-    DCH0CSIZ = 2;   // one byte per UART transfer request
+    DCH0DSIZ = 2;   // Size of SPI transmit register (16-bit mode)
+    DCH0CSIZ = 2;   // Two bytes per SPI transfer request
 
     // Channel 0 Settings
     DCH0CON = 0x43;          // Channel off, pri 3, allow events while disabled
@@ -62,7 +60,7 @@ void InitDMA(void)
 #pragma interrupt DmaCh0Int IPL7 vector 40
 void DmaCh0Int(void)
 {
-    //IFS1CLR = 0x10000;  // Clear channel 0 flag in interrupt controller
+    //IFS1CLR = 0x10000000;  // Clear channel 0 flag in interrupt controller
     DmaChnClrIntFlag(0);
     DCH0INTCLR = 0x8;   // Clear block transfer complete interrupt
     
