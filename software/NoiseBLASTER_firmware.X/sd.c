@@ -153,6 +153,43 @@ uint8_t SD_SendCmd(uint8_t cmd, uint32_t addr, uint8_t crc)
  }
 
 /**
+ * Read a variable amount of bytes off of the SD card starting at a specific
+ * byte address.
+ * 
+ * @param buffer        The buffer to put data into
+ * @param start_byte    The byte address to start reading from
+ * @param size          How many bytes to read
+ * 
+ * NOTE: With this implementation, only SECTOR_SIZE number of bytes can be
+ * safely read. Modifications need to be made to read more than SECTOR_SIZE
+ * number of bytes safely and efficiently.
+ */
+void SD_ReadData(void * buffer, uint32_t start_byte, size_t size)
+{
+    // Buffers to hold data across sector boundaries
+    uint8_t intermediate[MAX_SD_BUFFERS][SECTOR_SIZE];
+    int i = 0, j = 0;
+    
+    // How many bytes it takes up adding the bytes from the start of the sector
+    int size_from_start = size + (start_byte % SECTOR_SIZE);
+    
+    // Check if size is outside the boundaries and force to upper limit if so
+    if(size > ((MAX_SD_BUFFERS - 1) * SECTOR_SIZE))
+        size = (MAX_SD_BUFFERS - 1) * SECTOR_SIZE;
+    
+    // Operation fits within a single sector read
+    if(size_from_start <= SECTOR_SIZE)
+        SD_ReadSector((uint8_t *)intermediate, SECTOR_NUM(start_byte));
+    else
+        // Operation will cross sector boundaries, do a multi-sector read
+        SD_ReadMultiSectors(intermediate, SECTOR_NUM(start_byte), MAX_SD_BUFFERS);
+    
+    // Move from the intermediate buffer into the requested buffer
+    for(i = start_byte % SECTOR_SIZE; j < size; ++i, ++j)
+        *((uint8_t *)buffer + j) = intermediate[SECTOR_NUM(i)][i % SECTOR_SIZE];
+}
+
+/**
  * Reads a single sector from the SD Card
  * 
  * @param buffer A 512 byte buffer to store the sector in
@@ -162,7 +199,7 @@ void SD_ReadSector(uint8_t * buffer, uint32_t sector_num)
 {
     uint16_t i = 0;
     //uint32_t addr = sector_num * SECTOR_SIZE;
-    uint32_t addr = sector_num;
+    uint32_t addr = sector_num; // SDHC uses sector addressing, not byte
     
     SD_Enable(); // enable SD card
 
@@ -203,7 +240,7 @@ void SD_ReadSector(uint8_t * buffer, uint32_t sector_num)
 void SD_ReadMultiSectors(uint8_t buffer[][SECTOR_SIZE], uint32_t start_sector_num, uint32_t num_sectors)
 {
     uint16_t i, j;
-    uint32_t addr = start_sector_num * SECTOR_SIZE;
+    uint32_t addr = start_sector_num; // SDHC uses sector addressing, not byte
     
     SD_Enable(); // enable SD card
 

@@ -27,6 +27,7 @@
 #include "dac.h"
 #include "timer.h"
 #include "wav.h"
+#include "fat.h"
 
 #define NUM_SECTORS 60
 
@@ -43,12 +44,16 @@ int8_t frontbuffer[SECTOR_SIZE];
 int8_t backbuffer[SECTOR_SIZE];
 
 //Button Timer Flags
-volatile bool vol_minus_pressed;
-volatile bool play_pressed;
-volatile bool vol_plus_pressed;
-volatile bool vol_minus_held;
-volatile bool play_held;
-volatile bool vol_plus_held;
+volatile bool vol_minus_pressed = false;
+volatile bool play_pressed = false;
+volatile bool vol_plus_pressed = false;
+volatile bool vol_minus_held = false;
+volatile bool play_held = false;
+volatile bool vol_plus_held = false;
+
+// Variables needed for FAT
+struct FatPartition fat;
+struct FatFile file;
 
 // Init functions
 void InitPins(void);
@@ -106,33 +111,44 @@ int main(int argc, char** argv)
     InitTimer25Hz();
     InitDMA();
     
+    // Start up FAT stuff and open a file
+    OpenFirstFatPartition(&fat);
+    bool found_file = Fat_open(&fat, &file, "BLEED   ", "WAV");
+    //Fat_seek(&file, 44, FAT_SEEK_SET);
+    
+    if(!found_file)
+    {
+        DEBUG_LED_ON();
+        while(1) { }
+    }
+    
+    Fat_read(&file, (void*)frontbuffer, SECTOR_SIZE);
+    Fat_read(&file, (void*)backbuffer, SECTOR_SIZE);
+    
     // Enable global interrupts
     asm volatile("ei");
     
-    TestWavHeader();
+    //TestWavHeader();
     
-    
-    SD_ReadSector(frontbuffer, 0);
-    SD_ReadSector(backbuffer, 1);
     // Set the SIRQEN and CFORCE bits to start a DMA transfer
     DCH0ECONSET = 0x90;
     
     while(1){
         // Disable interrupts to avoid read/write problems when reading variables accessed by interrupts
         // Disable interrupts to avoid crashes during I2C read when an interrupt fires during transmission
-        // Enable intterupts at the end of the loop
+        // Enable interrupts at the end of the loop
         asm volatile("di");
         if (frontbuffer_done_sending){
             frontbuffer_done_sending = false;
             
-            SD_ReadSector(frontbuffer, currentSector);
+            Fat_read(&file, (void*)frontbuffer, SECTOR_SIZE);
             currentSector += 1;
         }
         
         if (backbuffer_done_sending){
             backbuffer_done_sending = false;
             
-            SD_ReadSector(backbuffer, currentSector);
+            Fat_read(&file, (void*)backbuffer, SECTOR_SIZE);
             currentSector += 1;
         }
         
@@ -162,6 +178,9 @@ int main(int argc, char** argv)
         }
         asm volatile("ei");
     }
+    
+    DEBUG_LED_ON();
+    
     return (EXIT_SUCCESS);
 }
 

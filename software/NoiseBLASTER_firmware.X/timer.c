@@ -16,12 +16,12 @@ volatile uint8_t play_button;
 volatile uint8_t vol_plus_button;
 
 //Button Timer Flags
-extern volatile bool vol_minus_pressed = false;
-extern volatile bool play_pressed = false;
-extern volatile bool vol_plus_pressed = false;
-extern volatile bool vol_minus_held = false;
-extern volatile bool play_held = false;
-extern volatile bool vol_plus_held = false;
+extern volatile bool vol_minus_pressed;
+extern volatile bool play_pressed;
+extern volatile bool vol_plus_pressed;
+extern volatile bool vol_minus_held;
+extern volatile bool play_held;
+extern volatile bool vol_plus_held;
 
 /*
  * Initializes the 25Hz Timer Interrupt
@@ -88,5 +88,5 @@ void __ISR(_TIMER_1_VECTOR, ipl2) Timer1Handler(void) {
         vol_plus_button = 0;
     }
     
-    mPORTAToggleBits(BIT_1);
+    //mPORTAToggleBits(BIT_1);
 }
