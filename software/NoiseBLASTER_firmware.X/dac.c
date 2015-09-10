@@ -191,14 +191,14 @@ void DAC_Reset()
 
 void DAC_VolumeUP()
 {
-    if(current_volume+1 <= 79){
-        DAC_VolumeControl(current_volume+1);
+    if(current_volume + 3 <= 79){
+        DAC_VolumeControl(current_volume+3);
     }
 }
 
 void DAC_VolumeDOWN()
 {
-    if(current_volume-1 >= 0){
-        DAC_VolumeControl(current_volume-1);
+    if(current_volume - 3 >= 0){
+        DAC_VolumeControl(current_volume-3);
     }
 }

@@ -2,6 +2,10 @@
 #include <stdbool.h>
 #include "fat.h"
 #include "sd.h"
+
+// Function prototypes
+static enum FatFileType GetFileType(unsigned char first);
+
 #define HAS_MBR
 bool OpenFirstFatPartition(struct FatPartition * fat)
 {
@@ -57,7 +61,7 @@ uint16_t GetFilesByExt(struct FatPartition * fat, struct FatFile * files, uint16
     for(i = 0; i < fat->boot.num_root_entries && num_found < num_files; ++i)
     {
         SD_ReadData(&entry, fat->root_start + (uint32_t)(i * sizeof(struct Fat16Entry)), sizeof(struct Fat16Entry));
-        if(strncmp(ext, entry.ext, 3) == 0)
+        if(strncmp(ext, entry.ext, 3) == 0 && GetFileType((unsigned char)entry.filename[0]) == FAT_TYPE_REGULAR)
         {
             Fat_open(fat, &(files[num_found]), entry.filename, entry.ext);
             num_found++;
@@ -79,7 +83,8 @@ bool Fat_open(struct FatPartition * fat, struct FatFile * file, char * filename,
         SD_ReadData(&entry, fat->root_start + (uint32_t)(i * sizeof(struct Fat16Entry)), sizeof(struct Fat16Entry));
 
         // Check if filename and extension match and if so, grab data
-        if(strncmp(ext, entry.ext, 3) == 0 && strncmp(filename, entry.filename, 8) == 0)
+        if(strncmp(ext, entry.ext, 3) == 0 && strncmp(filename, entry.filename, 8) == 0 &&
+                GetFileType((unsigned char)entry.filename[0]) == FAT_TYPE_REGULAR)
         {
             strncpy(file->filename, entry.filename, 8);
             strncpy(file->ext, entry.ext, 3);
@@ -89,6 +94,8 @@ bool Fat_open(struct FatPartition * fat, struct FatFile * file, char * filename,
             file->num_clusters = 0;
             file->cur_pos = 0;
             file->part = fat;
+            file->type = GetFileType((unsigned char)file->filename[0]);
+            
             found_file = true;
         }
     }
@@ -161,4 +168,39 @@ void Fat_seek(struct FatFile * file, uint32_t amount, enum SeekType type)
     // Update the current cluster number based on how many clusters we've increased by
     for(i = 0; i < num_cluster_increase; ++i)
         SD_ReadData(&(file->cur_cluster), file->part->fat_start + (file->cur_cluster * 2), 2);
+}
+
+/**
+ * Resets all of the pointers in the file back to zero
+ * 
+ * @param file The file to reset
+ */
+void ResetFile(struct FatFile * file)
+{
+    file->cur_cluster = file->starting_cluster;
+    file->num_clusters = 0;
+    file->cur_pos = 0;
+}
+
+/**
+ * Determines the type of a file based off the first character in the filename
+ * 
+ * @param first The first character in the filename
+ * 
+ * @return What type the file is
+ */
+static enum FatFileType GetFileType(unsigned char first)
+{
+    enum FatFileType type = FAT_TYPE_UNUSED;
+    
+    // Determine the type of the file based on the filename
+    switch(first) {
+        case 0x00: type = FAT_TYPE_UNUSED; break;
+        case 0xE5: type = FAT_TYPE_DELETED; break;
+        case 0x05: type = FAT_TYPE_E5; break;
+        case 0x2E: type = FAT_TYPE_FOLDER; break;
+        default: type = FAT_TYPE_REGULAR;
+    }
+    
+    return type;
 }

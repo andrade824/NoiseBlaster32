@@ -73,6 +73,9 @@ struct Fat16Entry {
     uint32_t filesize;  // In bytes
 } __attribute((packed));
 
+// The type a file represents
+enum FatFileType { FAT_TYPE_UNUSED, FAT_TYPE_DELETED, FAT_TYPE_E5, FAT_TYPE_REGULAR, FAT_TYPE_FOLDER };
+
 // Represents a file in the FAT partition
 struct FatFile {
     char filename[8];
@@ -82,6 +85,7 @@ struct FatFile {
     uint16_t num_clusters;   // How many clusters we've read through so far
     uint32_t cur_pos;   // Position within the current cluster in bytes
     uint32_t filesize;  // In bytes
+    enum FatFileType type; // What type of file entry is this
     struct FatPartition * part; // Pointer to the partition this file is in
     // TODO: Add file type (unused, deleted, starts_e5, directory, regular)
 };
@@ -101,6 +105,7 @@ uint16_t GetFilesByExt(struct FatPartition * fat, struct FatFile * files, uint16
 bool Fat_open(struct FatPartition * fat, struct FatFile * file, char * filename, char * ext);
 uint32_t Fat_read(struct FatFile * file, void * buffer, uint32_t num_bytes);
 void Fat_seek(struct FatFile * file, uint32_t amount, enum SeekType type);
+void ResetFile(struct FatFile * file);
 
 #endif	/* FAT_H */
 

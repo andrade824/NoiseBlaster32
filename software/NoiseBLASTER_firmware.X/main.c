@@ -31,13 +31,13 @@
 
 #define NUM_SECTORS 60
 
-uint32_t currentSector = 2;
+enum buffer_type { FRONT, BACK };
 
 // Flags to tell main to update data
 volatile bool frontbuffer_done_sending = 0;
 volatile bool backbuffer_done_sending = 0;
-enum buffer_type { FRONT, BACK };
 volatile enum buffer_type cur_buffer = FRONT;
+bool goto_next_song = false;
 
 // Buffers to store audio data
 int8_t frontbuffer[SECTOR_SIZE];
@@ -52,44 +52,19 @@ volatile bool play_held = false;
 volatile bool vol_plus_held = false;
 
 // Variables needed for FAT
+#define MAX_FILES 100
 struct FatPartition fat;
-struct FatFile file;
+struct FatFile files[MAX_FILES];
+uint16_t num_files = 0;
+uint16_t current_song = 0;
+uint32_t bytes_read = 0;
 
 // Init functions
 void InitPins(void);
+
 // Test functions
 void TestSDCard(void);
 void TestWavHeader();
-
-static enum {
-    EXCEP_IRQ = 0,            // interrupt
-    EXCEP_AdEL = 4,            // address error exception (load or ifetch)
-    EXCEP_AdES,                // address error exception (store)
-    EXCEP_IBE,                // bus error (ifetch)
-    EXCEP_DBE,                // bus error (load/store)
-    EXCEP_Sys,                // syscall
-    EXCEP_Bp,                // breakpoint
-    EXCEP_RI,                // reserved instruction
-    EXCEP_CpU,                // coprocessor unusable
-    EXCEP_Overflow,            // arithmetic overflow
-    EXCEP_Trap,                // trap (possible divide by zero)
-    EXCEP_IS1 = 16,            // implementation specfic 1
-    EXCEP_CEU,                // CorExtend Unuseable
-    EXCEP_C2E                // coprocessor 2
-} _excep_code;
-static unsigned int _epc_code;
-static unsigned int _excep_addr;
-// this function overrides the normal _weak_ generic handler
-void _general_exception_handler(void)
-{
-    asm volatile("mfc0 %0,$13" : "=r" (_excep_code));
-    asm volatile("mfc0 %0,$14" : "=r" (_excep_addr));
-    _excep_code = (_excep_code & 0x0000007C) >> 2;    
-    while (1) {
-        // Examine _excep_code to identify the type of exception
-        // Examine _excep_addr to find the address that caused the exception
-    }
-}
 
 int main(int argc, char** argv) 
 {
@@ -113,17 +88,16 @@ int main(int argc, char** argv)
     
     // Start up FAT stuff and open a file
     OpenFirstFatPartition(&fat);
-    bool found_file = Fat_open(&fat, &file, "BLEED   ", "WAV");
-    //Fat_seek(&file, 44, FAT_SEEK_SET);
+    num_files = GetFilesByExt(&fat, files, MAX_FILES, "WAV");
     
-    if(!found_file)
+    if(num_files == 0)
     {
         DEBUG_LED_ON();
         while(1) { }
     }
     
-    Fat_read(&file, (void*)frontbuffer, SECTOR_SIZE);
-    Fat_read(&file, (void*)backbuffer, SECTOR_SIZE);
+    Fat_read(&(files[current_song]), (void*)frontbuffer, SECTOR_SIZE);
+    Fat_read(&(files[current_song]), (void*)backbuffer, SECTOR_SIZE);
     
     // Enable global interrupts
     asm volatile("ei");
@@ -141,15 +115,27 @@ int main(int argc, char** argv)
         if (frontbuffer_done_sending){
             frontbuffer_done_sending = false;
             
-            Fat_read(&file, (void*)frontbuffer, SECTOR_SIZE);
-            currentSector += 1;
+            bytes_read = Fat_read(&(files[current_song]), (void*)frontbuffer, SECTOR_SIZE);
+            
+            if(bytes_read == 0)
+            {
+                ResetFile(&(files[current_song]));
+                current_song = (current_song + 1) % num_files;
+                Fat_read(&(files[current_song]), (void*)frontbuffer, SECTOR_SIZE);
+            }
         }
         
         if (backbuffer_done_sending){
             backbuffer_done_sending = false;
             
-            Fat_read(&file, (void*)backbuffer, SECTOR_SIZE);
-            currentSector += 1;
+            bytes_read = Fat_read(&(files[current_song]), (void*)backbuffer, SECTOR_SIZE);
+            
+            if(bytes_read == 0)
+            {
+                ResetFile(&(files[current_song]));
+                current_song = (current_song + 1) % num_files;
+                Fat_read(&(files[current_song]), (void*)frontbuffer, SECTOR_SIZE);
+            }
         }
         
         if (vol_plus_pressed == true){
@@ -157,7 +143,8 @@ int main(int argc, char** argv)
             vol_plus_pressed = false;
         }
         if (vol_plus_held == true){
-            currentSector += 25000;
+            ResetFile(&(files[current_song]));
+            current_song = (current_song + 1) % num_files;
             vol_plus_held = false;
         }
         /*
@@ -173,7 +160,13 @@ int main(int argc, char** argv)
             vol_minus_pressed = false;
         }
         if (vol_minus_held == true){
-            currentSector -= 25000;
+            ResetFile(&(files[current_song]));
+            
+            if(current_song == 0)
+                current_song = num_files - 1;
+            else
+                current_song--;
+            
             vol_minus_held = false;
         }
         asm volatile("ei");
@@ -298,4 +291,34 @@ void TestWavHeader(){
     UART_SendString(wavHeader.dataChunk);
     UART_SendNewLine();
     UART_SendNewLine();
+}
+
+static enum {
+    EXCEP_IRQ = 0,            // interrupt
+    EXCEP_AdEL = 4,            // address error exception (load or ifetch)
+    EXCEP_AdES,                // address error exception (store)
+    EXCEP_IBE,                // bus error (ifetch)
+    EXCEP_DBE,                // bus error (load/store)
+    EXCEP_Sys,                // syscall
+    EXCEP_Bp,                // breakpoint
+    EXCEP_RI,                // reserved instruction
+    EXCEP_CpU,                // coprocessor unusable
+    EXCEP_Overflow,            // arithmetic overflow
+    EXCEP_Trap,                // trap (possible divide by zero)
+    EXCEP_IS1 = 16,            // implementation specfic 1
+    EXCEP_CEU,                // CorExtend Unuseable
+    EXCEP_C2E                // coprocessor 2
+} _excep_code;
+static unsigned int _epc_code;
+static unsigned int _excep_addr;
+
+// this function overrides the normal _weak_ generic handler
+void _general_exception_handler(void)
+{
+    asm volatile("mfc0 %0,$13" : "=r" (_excep_code));
+    asm volatile("mfc0 %0,$14" : "=r" (_excep_addr));
+    _excep_code = (_excep_code & 0x0000007C) >> 2;    
+    while (1) {
+        DEBUG_LED_ON();
+    }
 }
