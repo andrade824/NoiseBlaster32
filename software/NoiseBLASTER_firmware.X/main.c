@@ -31,13 +31,16 @@
 
 #define NUM_SECTORS 60
 
+extern WAV_HEADER wavHeader;
+
 enum buffer_type { FRONT, BACK };
 
 // Flags to tell main to update data
 volatile bool frontbuffer_done_sending = 0;
 volatile bool backbuffer_done_sending = 0;
 volatile enum buffer_type cur_buffer = FRONT;
-bool goto_next_song = false;
+
+volatile bool playing = true;
 
 // Buffers to store audio data
 int8_t frontbuffer[SECTOR_SIZE];
@@ -62,9 +65,11 @@ uint32_t bytes_read = 0;
 // Init functions
 void InitPins(void);
 
-// Test functions
-void TestSDCard(void);
-void TestWavHeader();
+//Music Controls
+void play();
+void pause();
+void prevSong();
+void nextSong();
 
 int main(int argc, char** argv) 
 {
@@ -97,6 +102,9 @@ int main(int argc, char** argv)
     }
     
     Fat_read(&(files[current_song]), (void*)frontbuffer, SECTOR_SIZE);
+    readWavHeader(frontbuffer);
+    
+    Fat_read(&(files[current_song]), (void*)frontbuffer, SECTOR_SIZE);
     Fat_read(&(files[current_song]), (void*)backbuffer, SECTOR_SIZE);
     
     // Enable global interrupts
@@ -112,29 +120,27 @@ int main(int argc, char** argv)
         // Disable interrupts to avoid crashes during I2C read when an interrupt fires during transmission
         // Enable interrupts at the end of the loop
         asm volatile("di");
-        if (frontbuffer_done_sending){
-            frontbuffer_done_sending = false;
-            
-            bytes_read = Fat_read(&(files[current_song]), (void*)frontbuffer, SECTOR_SIZE);
-            
-            if(bytes_read == 0)
-            {
-                ResetFile(&(files[current_song]));
-                current_song = (current_song + 1) % num_files;
-                Fat_read(&(files[current_song]), (void*)frontbuffer, SECTOR_SIZE);
+        if(playing){
+            if (frontbuffer_done_sending){
+                frontbuffer_done_sending = false;
+
+                bytes_read = Fat_read(&(files[current_song]), (void*)frontbuffer, SECTOR_SIZE);
+
+                if(bytes_read < SECTOR_SIZE)
+                {
+                    nextSong();
+                }
             }
-        }
-        
-        if (backbuffer_done_sending){
-            backbuffer_done_sending = false;
-            
-            bytes_read = Fat_read(&(files[current_song]), (void*)backbuffer, SECTOR_SIZE);
-            
-            if(bytes_read == 0)
-            {
-                ResetFile(&(files[current_song]));
-                current_song = (current_song + 1) % num_files;
-                Fat_read(&(files[current_song]), (void*)frontbuffer, SECTOR_SIZE);
+
+            if (backbuffer_done_sending){
+                backbuffer_done_sending = false;
+
+                bytes_read = Fat_read(&(files[current_song]), (void*)backbuffer, SECTOR_SIZE);
+
+                if(bytes_read < SECTOR_SIZE)
+                {
+                    nextSong();
+                }
             }
         }
         
@@ -143,38 +149,89 @@ int main(int argc, char** argv)
             vol_plus_pressed = false;
         }
         if (vol_plus_held == true){
-            ResetFile(&(files[current_song]));
-            current_song = (current_song + 1) % num_files;
+            nextSong();
             vol_plus_held = false;
         }
-        /*
+        
         if (play_pressed == true){
-            
+            play_pressed = false;
+            if(playing){
+                pause();
+            }else{
+                play();
+            }
         }
-        if (play_held == true){
-            
-        }*/
+        else if (play_held == true){
+            play_held = false;
+            if(playing){
+                pause();
+            }else{
+                play();
+            }
+        }
         
         if (vol_minus_pressed == true){
             DAC_VolumeDOWN();
             vol_minus_pressed = false;
         }
         if (vol_minus_held == true){
-            ResetFile(&(files[current_song]));
-            
-            if(current_song == 0)
-                current_song = num_files - 1;
-            else
-                current_song--;
-            
+            prevSong(); 
             vol_minus_held = false;
         }
         asm volatile("ei");
     }
     
-    DEBUG_LED_ON();
-    
     return (EXIT_SUCCESS);
+}
+
+void play(){
+    playing = true;
+    DAC_DigitalControl(false);
+    DmaChnIntEnable(0);
+}
+
+void pause(){
+    playing = false;
+    DAC_DigitalControl(true);
+    DmaChnIntEnable(0);
+}
+
+void nextSong(){
+    DAC_DigitalControl(true);
+    if(current_song == num_files-1){
+        current_song = 0;
+    }else{
+        current_song = (current_song + 1) % num_files;
+    }
+    
+    ResetFile(&(files[current_song]));
+    Fat_read(&(files[current_song]), (void*)frontbuffer, SECTOR_SIZE);
+    readWavHeader(frontbuffer);
+
+    Fat_read(&(files[current_song]), (void*)frontbuffer, SECTOR_SIZE);
+    Fat_read(&(files[current_song]), (void*)backbuffer, SECTOR_SIZE);
+    backbuffer_done_sending = false;
+    frontbuffer_done_sending = false;
+    DAC_DigitalControl(false);
+}
+
+void prevSong(){
+    DAC_DigitalControl(true);
+    if(current_song == 0){
+        current_song = num_files-1;
+    }else{
+        current_song = (current_song - 1) % num_files;
+    }
+    
+    ResetFile(&(files[current_song]));
+    Fat_read(&(files[current_song]), (void*)frontbuffer, SECTOR_SIZE);
+    readWavHeader(frontbuffer);
+
+    Fat_read(&(files[current_song]), (void*)frontbuffer, SECTOR_SIZE);
+    Fat_read(&(files[current_song]), (void*)backbuffer, SECTOR_SIZE);
+    backbuffer_done_sending = false;
+    frontbuffer_done_sending = false;
+    DAC_DigitalControl(false);
 }
 
 void InitPins(void)
@@ -233,64 +290,6 @@ void InitPins(void)
     
     PPSOutput(1, RPB4, U1TX);
     PPSLock; // Prevent Accidental Mapping
-}
-
-void TestSDCard(void)
-{
-    int i, j;
-    uint8_t buffer[NUM_SECTORS][SECTOR_SIZE];
-    
-    UART_SendString("Starting sector read...\r\n");
-    SD_ReadMultiSectors(buffer, 0, NUM_SECTORS);
-    
-    UART_SendString("Dumping sectors...\r\n");
-    
-    for(i = 0; i < NUM_SECTORS; ++i)
-    {
-        UART_SendString("AABB");
-        for(j = 0; j < SECTOR_SIZE; ++j)
-            UART_SendByte(buffer[i][j]);
-    }
-    
-    DEBUG_LED_ON();
-    
-    UART_SendString("End Test\r\n");
-}
-
-void TestWavHeader(){
-    
-    extern WAV_HEADER wavHeader;
-    uint8_t wavSector[SECTOR_SIZE];
-
-    SD_ReadSector(wavSector, 0);
-    readWavHeader(wavSector);
-    
-    UART_SendNewLine();
-    UART_SendString(wavHeader.riffChunk);
-    UART_SendNewLine();
-    UART_SendInt(mergeUnsignedInt(wavHeader.fileSize,4));
-    UART_SendNewLine();
-    UART_SendString(wavHeader.format);
-    UART_SendNewLine();
-    UART_SendString(wavHeader.formatChunk);
-    UART_SendNewLine();
-    UART_SendInt(mergeUnsignedInt(wavHeader.formatChunkSize,4));
-    UART_SendNewLine();
-    UART_SendInt(mergeUnsignedInt(wavHeader.audioFormat,2));
-    UART_SendNewLine();
-    UART_SendInt(mergeUnsignedInt(wavHeader.channelCount,2));
-    UART_SendNewLine();
-    UART_SendInt(mergeUnsignedInt(wavHeader.sampleRate,4));
-    UART_SendNewLine();
-    UART_SendInt(mergeUnsignedInt(wavHeader.bytesPerSecond,4));
-    UART_SendNewLine();
-    UART_SendInt(mergeUnsignedInt(wavHeader.blockAlign,2));
-    UART_SendNewLine();
-    UART_SendInt(mergeUnsignedInt(wavHeader.bitsPerSample,2));
-    UART_SendNewLine();
-    UART_SendString(wavHeader.dataChunk);
-    UART_SendNewLine();
-    UART_SendNewLine();
 }
 
 static enum {

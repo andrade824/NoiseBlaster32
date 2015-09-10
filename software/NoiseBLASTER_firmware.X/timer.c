@@ -23,6 +23,8 @@ extern volatile bool vol_minus_held;
 extern volatile bool play_held;
 extern volatile bool vol_plus_held;
 
+extern volatile bool playing;
+
 /*
  * Initializes the 25Hz Timer Interrupt
  */
@@ -53,7 +55,7 @@ void __ISR(_TIMER_1_VECTOR, ipl2) Timer1Handler(void) {
             vol_minus_held = true;
         }
     } else {
-        if(vol_minus_button >= 2 && vol_minus_button < 15){
+        if(vol_minus_button >= 3 && vol_minus_button < 15){
             // Execute vol minus
             vol_minus_pressed = true;
         }
@@ -67,7 +69,7 @@ void __ISR(_TIMER_1_VECTOR, ipl2) Timer1Handler(void) {
             play_held = true;
         }
     }else {
-        if(vol_minus_button >= 2 && vol_minus_button < 15){
+        if(play_button >= 3 && play_button < 15){
             // Execute play press
             play_pressed = true;
         }
@@ -81,12 +83,15 @@ void __ISR(_TIMER_1_VECTOR, ipl2) Timer1Handler(void) {
             vol_plus_held = true;
         }
     } else {
-        if(vol_plus_button >= 2 && vol_plus_button < 15){
+        if(vol_plus_button >= 3 && vol_plus_button < 15){
             // Execute vol plus
             vol_plus_pressed = true;
         }
         vol_plus_button = 0;
     }
-    
-    //mPORTAToggleBits(BIT_1);
+    if(playing){
+        mPORTAToggleBits(BIT_1);
+    } else{
+        mPORTASetBits(BIT_1);
+    }
 }
